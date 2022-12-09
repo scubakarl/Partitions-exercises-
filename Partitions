@@ -1,0 +1,80 @@
+### These are examples of partition exercises for future reference. I plan to use add to these in future projects to create addtional queries. 
+
+These are from a project in coursera to "Creating Date-Partitioned Tables in BigQuery" 
+
+
+
+
+#standardSQL
+SELECT DISTINCT
+  fullVisitorId,
+  date,
+  city,
+  pageTitle
+FROM `data-to-insights.ecommerce.all_sessions_raw`
+WHERE date = '20180708'
+LIMIT 5
+
+
+
+##########################
+
+
+In this query, note the new option - PARTITION BY a field. The two options available to partition are DATE and TIMESTAMP. 
+The PARSE_DATE function is used on the date field (stored as a string) to get it into the proper DATE type for partitioning.
+#Creating tables like this below greatly reduces time and memory
+
+#standardSQL
+ CREATE OR REPLACE TABLE ecommerce.partition_by_day
+ PARTITION BY date_formatted
+ OPTIONS(
+   description="a table partitioned by date"
+ ) AS
+ SELECT DISTINCT
+ PARSE_DATE("%Y%m%d", date) AS date_formatted,
+ fullvisitorId
+ FROM `data-to-insights.ecommerce.all_sessions_raw`
+
+
+#######################
+#standardSQL
+ SELECT
+   DATE(CAST(year AS INT64), CAST(mo AS INT64), CAST(da AS INT64)) AS date,
+   (SELECT ANY_VALUE(name) FROM `bigquery-public-data.noaa_gsod.stations` AS stations
+    WHERE stations.usaf = stn) AS station_name,  -- Stations may have multiple names
+   prcp
+ FROM `bigquery-public-data.noaa_gsod.gsod*` AS weather
+ WHERE prcp < 99.9  -- Filter unknown values
+   AND prcp > 0      -- Filter stations/days with no precipitation
+   AND _TABLE_SUFFIX >= '2018'
+ ORDER BY date DESC -- Where has it rained/snowed recently
+ LIMIT 10
+ 
+ #######################
+create a table that:
+
+Queries on weather data from 2018 onward
+
+Filters to only include days that have had some precipitation (rain, snow, etc.)
+
+Only stores each partition of data for 90 days from that partition's date (rolling window) 
+
+
+#standardSQL
+ CREATE OR REPLACE TABLE ecommerce.days_with_rain
+ PARTITION BY date
+ OPTIONS (
+   partition_expiration_days=60,
+   description="weather stations with precipitation, partitioned by day"
+ ) AS
+ SELECT
+   DATE(CAST(year AS INT64), CAST(mo AS INT64), CAST(da AS INT64)) AS date,
+   (SELECT ANY_VALUE(name) FROM `bigquery-public-data.noaa_gsod.stations` AS stations
+    WHERE stations.usaf = stn) AS station_name,  -- Stations may have multiple names
+   prcp
+ FROM `bigquery-public-data.noaa_gsod.gsod*` AS weather
+ WHERE prcp < 99.9  -- Filter unknown values
+   AND prcp > 0      -- Filter
+   AND _TABLE_SUFFIX >= '2018'
+   
+   
